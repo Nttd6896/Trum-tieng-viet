@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Trùm Tiếng Việt</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0f2744;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  /* Ngăn zoom khi tap trên iOS */
+  touch-action: manipulation;
+}
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, #1a3a5c, #0f2744);
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 2px solid #f39c12;
+}
+.game-title { color: #f39c12; font-size: 17px; font-weight: 900; letter-spacing: 1px; }
+.game-title span { color: white; }
+.header-sub { font-size: 11px; color: #7a9cc0; }
+
+/* HUD — 4 ô ngang, không wrap */
+.hud {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 8px 10px;
+  background: #162d4a;
+  border-bottom: 1px solid #1e3d5a;
+  gap: 4px;
+}
+.hud-item { text-align: center; }
+.hud-label { font-size: 9px; color: #7a9cc0; text-transform: uppercase; letter-spacing: 0.5px; }
+.hud-value { font-size: 18px; font-weight: 800; color: white; line-height: 1.2; }
+.hud-value.timer { color: #f39c12; }
+.hud-value.timer.urgent { color: #e74c3c; animation: pulse 0.5s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.4; } }
+
+/* PROGRESS */
+.progress-wrap { background: #1e3d5a; height: 4px; }
+.progress-fill { height: 4px; background: #f39c12; transition: width 0.4s; }
+
+/* MAIN */
+.main {
+  flex: 1;
+  padding: 12px 12px 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* QUESTION NUMBER */
+.q-number {
+  text-align: center; font-size: 11px; color: #7a9cc0;
+  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;
+}
+
+/* ANSWER ZONE */
+.answer-zone-label {
+  font-size: 10px; color: #7a9cc0;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.answer-zone {
+  min-height: 68px;
+  background: #162d4a;
+  border: 2px dashed #2e5a80; border-radius: 12px;
+  padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 5px;
+  align-items: center; margin-bottom: 8px;
+  transition: border-color 0.3s;
+}
+.answer-zone.correct { border-color: #27ae60; background: #0d2d1a; }
+.answer-zone.wrong { border-color: #e74c3c; background: #2d0d0d; animation: shake 0.3s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+.answer-zone-placeholder { color: #3a6080; font-size: 13px; font-style: italic; }
+
+/* SCRAMBLE ZONE */
+.scramble-label {
+  font-size: 10px; color: #7a9cc0;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+}
+.scramble-zone {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  min-height: 52px; margin-bottom: 14px;
+}
+
+/* WORD CHIPS — tự co theo màn hình */
+.word-chip {
+  min-width: 42px;
+  min-height: 44px;
+  padding: 6px 10px;
+  /* Dùng inline-block thay inline-flex để tránh lỗi iOS Safari */
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 9px;
+  font-size: clamp(15px, 4.5vw, 20px);
+  font-weight: 900;
+  line-height: 44px; /* căn dọc bằng line-height thay vì flexbox */
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: background-color 0.12s, transform 0.12s, box-shadow 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  text-align: center;
+  /* KHÔNG dùng -webkit-appearance: none — gây lỗi color trên iOS */
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  /* Đảm bảo màu chữ không bị iOS override */
+  opacity: 1;
+  position: relative;
+  overflow: visible;
+}
+.word-chip.scramble-chip {
+  background-color: #f39c12 !important;
+  color: #1a1a2e !important;
+  box-shadow: 0 3px 0 #c47d0a;
+  border-color: #c47d0a;
+}
+.word-chip.scramble-chip:active { transform: translateY(2px); box-shadow: 0 1px 0 #c47d0a; }
+
+/* Chip chữ cái ĐẦU TIÊN của câu */
+.word-chip.scramble-chip.first-char {
+  background-color: #e74c3c !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 0 #a93226;
+  border-color: #a93226;
+}
+.word-chip.scramble-chip.first-char:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #a93226;
+}
+.word-chip.answer-chip {
+  background-color: #1565c0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 0 #0d47a1;
+  border-color: #0d47a1;
+}
+.word-chip.answer-chip:active { background-color: #1976d2 !important; }
+.word-chip.answer-chip.correct-chip {
+  background-color: #2e7d32 !important;
+  border-color: #1b5e20 !important;
+  box-shadow: 0 3px 0 #1b5e20;
+  cursor: default;
+}
+
+/* ACTION BUTTONS */
+.action-row { display: flex; gap: 8px; margin-top: auto; }
+.btn-undo {
+  flex: 1; padding: 13px 8px; border-radius: 12px; border: 2px solid #2e5a80;
+  background: transparent; color: #7a9cc0; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-undo:active { background: #162d4a; color: white; }
+.btn-skip {
+  flex: 1; padding: 13px 8px; border-radius: 12px; border: none;
+  background: #c0392b; color: white; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-skip:active { background: #e74c3c; }
+
+/* RESULT OVERLAY */
+.result-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+  align-items: center; justify-content: center; z-index: 100;
+  padding: 16px;
+}
+.result-overlay.show { display: flex; }
+.result-box {
+  background: #162d4a; border-radius: 20px; padding: 28px 24px;
+  text-align: center; max-width: 360px; width: 100%;
+  border: 2px solid #f39c12;
+}
+.result-emoji { font-size: 56px; margin-bottom: 10px; }
+.result-title { font-size: 24px; font-weight: 900; color: #f39c12; margin-bottom: 6px; }
+.result-sub { font-size: 14px; color: #7a9cc0; margin-bottom: 20px; line-height: 1.6; }
+.result-score { font-size: 44px; font-weight: 900; color: white; margin-bottom: 6px; }
+.result-score-label { font-size: 13px; color: #7a9cc0; margin-bottom: 22px; }
+.btn-restart {
+  width: 100%; padding: 14px; border-radius: 12px; border: none;
+  background: #f39c12; color: #0f2744; font-size: 17px; font-weight: 900;
+  cursor: pointer; min-height: 50px;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-restart:active { background: #e67e22; }
+
+/* FEEDBACK TOAST — tránh vùng safe area iOS */
+.toast {
+  position: fixed;
+  bottom: max(80px, env(safe-area-inset-bottom, 80px));
+  left: 50%; transform: translateX(-50%);
+  padding: 11px 22px; border-radius: 28px; font-size: 15px; font-weight: 700;
+  color: white; z-index: 200; opacity: 0; transition: opacity 0.2s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast.correct-toast { background: #27ae60; }
+.toast.wrong-toast { background: #e74c3c; }
+.toast.skip-toast { background: #7f8c8d; }
+
+/* CORRECT ANSWER REVEAL */
+.answer-reveal {
+  display: none; margin-top: 8px; text-align: center;
+  font-size: 13px; color: #7a9cc0;
+}
+.answer-reveal .correct-answer { color: #f39c12; font-weight: 700; font-size: 16px; }
+.answer-reveal.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="game-title">TRÙM <span>TIẾNG VIỆT</span></div>
+  <div class="header-sub">An toàn lao động</div>
+</div>
+
+<div class="hud">
+  <div class="hud-item">
+    <div class="hud-label">Câu</div>
+    <div class="hud-value" id="hudQ">1 / 83</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">⏱ Thời gian</div>
+    <div class="hud-value timer" id="hudTimer">30</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">✓ Đúng</div>
+    <div class="hud-value" id="hudCorrect" style="color:#27ae60">0</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">✗ Sai / Bỏ</div>
+    <div class="hud-value" id="hudWrong" style="color:#e74c3c">0</div>
+  </div>
+</div>
+
+<div class="progress-wrap"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+<div class="main">
+  <div class="q-number" id="qNumber">Câu 1 trong 83</div>
+
+  <div class="answer-zone-label">Ghép câu trả lời (không cần khoảng trắng):</div>
+  <div class="answer-zone" id="answerZone">
+    <span class="answer-zone-placeholder" id="answerPlaceholder">Nhấn vào các chữ cái bên dưới để ghép câu...</span>
+  </div>
+
+  <div class="answer-reveal" id="answerReveal">
+    Đáp án đúng: <span class="correct-answer" id="correctAnswerText"></span>
+  </div>
+
+  <div class="scramble-label">Các chữ cái đã xáo trộn <span style="font-weight:400;color:#7a9cc0;font-size:13px;">(<span style="color:#e74c3c;font-weight:700;">●</span> chữ cái đầu của câu)</span>:</div>
+  <div class="scramble-zone" id="scrambleZone"></div>
+
+  <div class="action-row">
+    <button class="btn-undo" onclick="undoLast()">↩ Xóa chữ cuối</button>
+    <button class="btn-skip" onclick="skipQuestion()">⏭ Bỏ qua</button>
+  </div>
+</div>
+
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-box">
+    <div class="result-emoji" id="resultEmoji">🏆</div>
+    <div class="result-title">KẾT QUẢ</div>
+    <div class="result-score" id="resultScore">0</div>
+    <div class="result-score-label">/ 83 câu đúng</div>
+    <div class="result-sub" id="resultSub"></div>
+    <button class="btn-restart" onclick="restartGame()">🔄 Chơi lại</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Mỗi phần tử là mảng các ÂM TIẾT — không dùng split() để tránh lỗi Unicode
+const PHRASES = [
+  ["Rác","hữu","cơ"],
+  ["An","toàn","lao","động"],
+  ["Găng","tay","cao","su"],
+  ["Xe","chữa","cháy"],
+  ["Ô","nhiễm","không","khí"],
+  ["Khóa","vận","hành"],
+  ["Vòi","rửa","mắt"],
+  ["Bảo","vệ","môi","trường"],
+  ["Xử","lý","nước","thải"],
+  ["Thu","hồi","năng","lượng"],
+  ["Găng","tay","chống","cháy"],
+  ["Xử","lý","khí","thải"],
+  ["Máy","đo","huyết","áp"],
+  ["Rác","vô","cơ"],
+  ["Quan","trắc","môi","trường"],
+  ["Ô","nhiễm","nước"],
+  ["Trụ","nước","chữa","cháy"],
+  ["Tiết","kiệm","năng","lượng"],
+  ["Khóa","thiết","bị"],
+  ["Cân","sức","khoẻ"],
+  ["Rác","tái","chế"],
+  ["Nước","thải","sinh","hoạt"],
+  ["Găng","tay","hàn"],
+  ["Ô","nhiễm","tiếng","ồn"],
+  ["Áo","phản","quang"],
+  ["Công","nghệ","xanh"],
+  ["Hộp","đựng","khóa"],
+  ["Rác","nguy","hại"],
+  ["Rác","phải","kiểm","soát"],
+  ["Ô","nhiễm","ánh","sáng"],
+  ["Bộ","dụng","cụ","trợ","thở"],
+  ["Yếu","tố","nguy","hiểm"],
+  ["Nút","ấn","báo","cháy"],
+  ["Năng","lượng","tái","tạo"],
+  ["Ô","nhiễm","thị","giác"],
+  ["Yếu","tố","có","hại"],
+  ["Phao","cứu","hộ"],
+  ["Vòi","tắm","khẩn","cấp"],
+  ["Tái","chế","phế","liệu"],
+  ["Cáng","cứu","thương"],
+  ["Vòi","chữa","cháy"],
+  ["Khám","sức","khoẻ"],
+  ["Nón","bảo","hiểm"],
+  ["Giờ","trái","đất"],
+  ["Khí","nhà","kính"],
+  ["Túi","chỉ","hướng","gió"],
+  ["Mặt","nạ","phòng","độc"],
+  ["Phát","triển","bền","vững"],
+  ["Bệnh","nghề","nghiệp"],
+  ["Vệ","sinh","lao","động"],
+  ["Tai","nạn","lao","động"],
+  ["Huấn","luyện","an","toàn"],
+  ["An","toàn","vệ","sinh","viên"],
+  ["Phương","án","chữa","cháy"],
+  ["Không","gian","hạn","chế"],
+  ["Thiết","bị","kiểm","định"],
+  ["Làm","việc","trên","cao"],
+  ["Thiết","bị","an","toàn"],
+  ["Bảo","hiểm","cháy","nổ"],
+  ["Xì","tràn","hóa","chất"],
+  ["Phương","án","cứu","nạn"],
+  ["Cấm","chụp","hình"],
+  ["Lối","thoát","hiểm"],
+  ["Sàn","trơn","trượt"],
+  ["Thiết","bị","đang","quay"],
+  ["Tủ","thuốc","sơ","cứu"],
+  ["Vị","trí","bình","chữa","cháy"],
+  ["Hiến","máu","nhân","đạo"],
+  ["Giấy","phép","làm","việc"],
+  ["Điều","tra","tai","nạn"],
+  ["Quản","lý","sự","thay","đổi"],
+  ["Rác","thải","sinh","hoạt"],
+  ["Quản","lý","hóa","chất"],
+  ["Hàng","hóa","nguy","hiểm"],
+  ["Quản","lý","nhà","thầu"],
+  ["Rác","thải","nguy","hại"],
+  ["Đầu","dò","nhiệt"],
+  ["Huấn","luyện","nhà","thầu"],
+  ["Chuông","báo","cháy"],
+  ["Đầu","dò","khói"],
+  ["Thực","tập","chữa","cháy"],
+  ["Bọt","chữa","cháy"],
+  ["Còi","báo","động"],
+  ["Phân","loại","bùn","thải"]
+];
+
+// Shuffle phrases order
+let questionOrder = [];
+let currentIdx = 0;
+let correctCount = 0;
+let wrongCount = 0;
+let timerInterval = null;
+let timeLeft = 30;
+let answered = false;
+
+// Answer state
+let answerWords = [];   // words placed by user
+let scrambleWords = []; // remaining words in pool
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Lấy chuỗi đáp án chuẩn (viết hoa, không khoảng trắng) từ mảng âm tiết
+function getAnswerString(phraseArr) {
+  return phraseArr.join('').toUpperCase();
+  // Lưu ý: join('') vì đã bỏ khoảng trắng theo luật chơi mới
+}
+
+// Tách chuỗi thành mảng ký tự — dùng Array.from để xử lý đúng Unicode tiếng Việt
+function splitChars(str) {
+  return Array.from(str);
+}
+
+// Xáo trộn các ký tự của câu, đảm bảo thứ tự khác bản gốc
+// Trả về mảng object {char, isFirst} để biết chip nào là chữ cái đầu của câu
+function scramblePhrase(phraseArr) {
+  const original = getAnswerString(phraseArr);
+  const chars = splitChars(original);
+  if (chars.length <= 1) {
+    return chars.map((c, i) => ({ char: c, isFirst: i === 0 }));
+  }
+  // Tạo mảng object - chỉ ký tự đầu tiên có isFirst = true
+  // Dùng object thay vì so sánh char vì nhiều chữ có thể trùng
+  const objs = chars.map((c, i) => ({ char: c, isFirst: i === 0 }));
+  let scrambled;
+  let attempts = 0;
+  do {
+    scrambled = shuffle(objs);
+    attempts++;
+  } while (scrambled.map(o => o.char).join('') === original && attempts < 20);
+  return scrambled;
+}
+
+function startGame() {
+  questionOrder = shuffle([...Array(PHRASES.length).keys()]);
+  currentIdx = 0;
+  correctCount = 0;
+  wrongCount = 0;
+  document.getElementById('resultOverlay').classList.remove('show');
+  loadQuestion();
+}
+
+function loadQuestion() {
+  if (currentIdx >= PHRASES.length) { showResult(); return; }
+  answered = false;
+
+  const phraseIdx = questionOrder[currentIdx];
+  const phrase = PHRASES[phraseIdx];
+  const correctAnswer = getAnswerString(phrase);
+
+  answerWords = [];
+  scrambleWords = scramblePhrase(phrase);
+
+  // UI
+  const total = PHRASES.length;
+  document.getElementById('hudQ').textContent = `${currentIdx + 1} / ${total}`;
+  document.getElementById('qNumber').textContent = `Câu ${currentIdx + 1} trong ${total}`;
+  document.getElementById('progressFill').style.width = (currentIdx / total * 100) + '%';
+  document.getElementById('hudCorrect').textContent = correctCount;
+  document.getElementById('hudWrong').textContent = wrongCount;
+  document.getElementById('answerReveal').classList.remove('show');
+  // Hiển thị đáp án gốc có khoảng trắng để người chơi dễ đọc khi sai
+  document.getElementById('correctAnswerText').textContent = phrase.join(' ').toUpperCase();
+
+  renderScramble();
+  renderAnswer();
+
+  const az = document.getElementById('answerZone');
+  az.classList.remove('correct', 'wrong');
+
+  // Timer — thời gian linh hoạt theo độ dài: ~5 giây/ký tự, min 30, max 90
+  clearInterval(timerInterval);
+  const charCount = scrambleWords.length;
+  timeLeft = Math.min(90, Math.max(30, charCount * 5));
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      timeOut();
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const el = document.getElementById('hudTimer');
+  el.textContent = timeLeft;
+  el.classList.toggle('urgent', timeLeft <= 10);
+}
+
+function renderScramble() {
+  const zone = document.getElementById('scrambleZone');
+  zone.innerHTML = '';
+  scrambleWords.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-chip scramble-chip';
+    if (w.isFirst) btn.classList.add('first-char');
+    btn.textContent = w.char;
+    // iOS Safari: đặt màu inline để chắc chắn không bị override
+    if (w.isFirst) {
+      btn.style.cssText = 'background-color:#e74c3c;color:#ffffff;';
+    } else {
+      btn.style.cssText = 'background-color:#f39c12;color:#1a1a2e;';
+    }
+    btn.onclick = () => pickWord(i);
+    zone.appendChild(btn);
+  });
+}
+
+// Tham chiếu placeholder lưu module-level, không bị mất khi innerHTML='' xóa DOM
+let placeholderEl = null;
+
+function renderAnswer() {
+  const zone = document.getElementById('answerZone');
+  // Lấy placeholder lần đầu, sau đó tái sử dụng tham chiếu
+  if (!placeholderEl) {
+    placeholderEl = document.getElementById('answerPlaceholder');
+  }
+  zone.innerHTML = '';
+
+  if (answerWords.length === 0) {
+    if (placeholderEl) {
+      placeholderEl.style.display = '';
+      zone.appendChild(placeholderEl);
+    }
+    return;
+  }
+
+  answerWords.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-chip answer-chip';
+    btn.textContent = w.char;
+    btn.style.cssText = 'background-color:#1565c0;color:#ffffff;';
+    btn.onclick = () => returnWord(i);
+    zone.appendChild(btn);
+  });
+}
+
+function pickWord(scrambleIdx) {
+  if (answered) return;
+  const word = scrambleWords[scrambleIdx];
+  scrambleWords.splice(scrambleIdx, 1);
+  answerWords.push(word);
+  renderScramble();
+  renderAnswer();
+
+  // Auto-check when all words placed
+  if (scrambleWords.length === 0) checkAnswer();
+}
+
+function returnWord(answerIdx) {
+  if (answered) return;
+  const word = answerWords[answerIdx];
+  answerWords.splice(answerIdx, 1);
+  scrambleWords.push(word);
+  renderScramble();
+  renderAnswer();
+}
+
+function checkAnswer() {
+  const phraseIdx = questionOrder[currentIdx];
+  const phrase = PHRASES[phraseIdx];
+  const correctAnswer = getAnswerString(phrase);
+  const userAnswer = answerWords.map(w => w.char).join('');
+  const az = document.getElementById('answerZone');
+
+  clearInterval(timerInterval);
+  answered = true;
+
+  if (userAnswer === correctAnswer) {
+    az.classList.add('correct');
+    // Make chips green
+    az.querySelectorAll('.answer-chip').forEach(c => c.classList.add('correct-chip'));
+    correctCount++;
+    showToast('✓ Chính xác!', 'correct-toast');
+    setTimeout(nextQuestion, 1200);
+  } else {
+    az.classList.add('wrong');
+    wrongCount++;
+    showToast('✗ Chưa đúng!', 'wrong-toast');
+    document.getElementById('answerReveal').classList.add('show');
+    setTimeout(nextQuestion, 2000);
+  }
+  document.getElementById('hudCorrect').textContent = correctCount;
+  document.getElementById('hudWrong').textContent = wrongCount;
+}
+
+function undoLast() {
+  if (answered || answerWords.length === 0) return;
+  const word = answerWords.pop();
+  scrambleWords.push(word);
+  renderScramble();
+  renderAnswer();
+}
+
+function skipQuestion() {
+  if (answered) return;
+  clearInterval(timerInterval);
+  answered = true;
+  wrongCount++;
+  document.getElementById('hudWrong').textContent = wrongCount;
+  showToast('⏭ Bỏ qua', 'skip-toast');
+  document.getElementById('correctAnswerText').textContent = PHRASES[questionOrder[currentIdx]].join(' ').toUpperCase();
+  document.getElementById('answerReveal').classList.add('show');
+  setTimeout(nextQuestion, 1800);
+}
+
+function timeOut() {
+  if (answered) return;
+  answered = true;
+  wrongCount++;
+  document.getElementById('hudWrong').textContent = wrongCount;
+  showToast('⏰ Hết giờ!', 'wrong-toast');
+  document.getElementById('answerZone').classList.add('wrong');
+  document.getElementById('correctAnswerText').textContent = PHRASES[questionOrder[currentIdx]].join(' ').toUpperCase();
+  document.getElementById('answerReveal').classList.add('show');
+  setTimeout(nextQuestion, 2000);
+}
+
+function nextQuestion() {
+  currentIdx++;
+  loadQuestion();
+}
+
+function showResult() {
+  clearInterval(timerInterval);
+  const pct = Math.round(correctCount / PHRASES.length * 100);
+  document.getElementById('resultScore').textContent = correctCount;
+  let emoji = '🏆', sub = '';
+  if (pct >= 90) { emoji = '🏆'; sub = 'Xuất sắc! Bạn là Trùm Tiếng Việt thật sự!'; }
+  else if (pct >= 70) { emoji = '🥇'; sub = `Rất tốt! Bạn đúng ${pct}% — tiếp tục luyện thêm nhé!`; }
+  else if (pct >= 50) { emoji = '💪'; sub = `Khá ổn! ${pct}% — ôn thêm một chút nữa!`; }
+  else { emoji = '📚'; sub = `${pct}% — Hãy ôn luyện thêm, bạn sẽ làm được!`; }
+  document.getElementById('resultEmoji').textContent = emoji;
+  document.getElementById('resultSub').textContent = sub;
+  document.getElementById('resultOverlay').classList.add('show');
+}
+
+function restartGame() {
+  startGame();
+}
+
+function showToast(msg, cls) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + cls + ' show';
+  setTimeout(() => t.className = 'toast', 1500);
+}
+
+// Start!
+startGame();
+</script>
+</body>
+</html>
